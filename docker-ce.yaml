@@ -1,7 +1,7 @@
 ---
 
 - hosts: all
-  remote_user: root
+  remote_user: vagrant
   become: yes
   become_method: sudo
   tasks:
@@ -62,13 +62,13 @@
     register: docker_info
     changed_when: False
 
-- hosts: docker-manager-first
-  remote_user: root
+- hosts: docker-manager
+  remote_user: vagrant
   become: yes
   become_method: sudo
   tasks:
   - name: "create primary swarm manager"
-    shell: docker swarm init --advertise-addr {{ ansible_eth0['ipv4']['address'] }}
+    shell: docker swarm init --advertise-addr {{ ansible_eth1['ipv4']['address'] }}
     when: "docker_info.stdout.find('Swarm: inactive') != -1"
 
   - name: "get docker swarm manager token"
@@ -79,30 +79,20 @@
     shell: docker swarm join-token -q worker
     register: worker_token
 
-- hosts: docker-managers
-  remote_user: root
-  become: yes
-  become_method: sudo
-  tasks:
-  - name: "join as a manager"
-    shell: "docker swarm join --token {{ hostvars['manager1']['manager_token']['stdout'] }} {{ hostvars['manager1']['ansible_eth0']['ipv4']['address'] }}:2377"
-    when: docker_info.stdout.find("Swarm{{':'}} inactive") != -1
-    retries: 3
-    delay: 20
 
 - hosts: docker-workers
-  remote_user: root
+  remote_user: vagrant
   become: yes
   become_method: sudo
   tasks:
   - name: "join as a worker"
-    shell: "docker swarm join --token {{ hostvars['manager1']['worker_token']['stdout'] }} {{ hostvars['manager1']['ansible_eth0']['ipv4']['address'] }}:2377"
+    shell: "docker swarm join --token {{ hostvars['manager']['worker_token']['stdout'] }} {{ hostvars['manager']['ansible_eth1']['ipv4']['address'] }}:2377"
     when: "docker_info.stdout.find('Swarm: inactive') != -1"
     retries: 3
     delay: 20
 
 - hosts: docker-api
-  remote_user: root
+  remote_user: vagrant
   become: yes
   become_method: sudo
   tasks:
@@ -137,7 +127,7 @@
       - check_has_api.stdout == ""
 
 - hosts: docker-cloud
-  remote_user: root
+  remote_user: vagrant
   become: yes
   become_method: sudo
   tasks:
@@ -165,21 +155,21 @@
     when:
       - service_wrapper.stat.exists
 
-- hosts: docker-manager-first
-  remote_user: root
+- hosts: docker-manager
+  remote_user: vagrant
   become: yes
   become_method: sudo
   tasks:
   - name: List networks
     shell: docker network ls
     register: docker_networks
-  - name: Create network when not there
-    shell: docker network create --driver overlay --subnet {{ item.subnet }} --gateway {{ item.gateway }} {{ item.name }}
-    with_items:
-        -  {
-            	name: 'caylent-default',
-            	subnet: '17.0.0.0/16',
-            	gateway: '17.0.0.1'
-            }
-
-    when: docker_networks.stdout.find( item.name ) == -1
+ # - name: Create network when not there
+ #   shell: docker network create --driver overlay --subnet {{ item.subnet }} --gateway {{ item.gateway }} {{ item.name }}
+ #   with_items:
+ #       -  {
+ #           	name: 'caylent-default',
+ #           	subnet: '17.0.0.0/16',
+ #           	gateway: '17.0.0.1'
+ #           }
+ #
+ #   when: docker_networks.stdout.find( item.name ) == -1

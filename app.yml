@@ -1,0 +1,11 @@
+---
+- hosts: manager
+  remote_user: vagrant
+  become: yes
+  become_method: sudo
+  tasks:
+   - name: application container
+     docker_container:
+       name: ubuntuserver
+       image: hello-world:latest
+       state: started
